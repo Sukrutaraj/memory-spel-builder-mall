@@ -116,15 +116,27 @@ document.addEventListener("click",e=>{
 
 function speak(text,langCode){
   if(!text){alert("Ingen text.");return;}
-  const synth=window.speechSynthesis;synth.cancel();
-  const utt=new SpeechSynthesisUtterance(text);
-  utt.lang=langCode;utt.rate=0.85;
+  const synth=window.speechSynthesis;
+  synth.cancel();
+  function doSpeak(){
+    const utt=new SpeechSynthesisUtterance(text);
+    utt.lang=langCode; utt.rate=0.85;
+    const voices=synth.getVoices();
+    const base=langCode.split("-")[0];
+    // Try exact match first, then prefix match
+    const m=voices.find(v=>v.lang===langCode)||voices.find(v=>v.lang.startsWith(base));
+    if(m) utt.voice=m;
+    synth.speak(utt);
+  }
+  // If voices not loaded yet, wait for them
   const voices=synth.getVoices();
-  const m=voices.find(v=>v.lang.startsWith(langCode.split("-")[0]));
-  if(m) utt.voice=m;
-  synth.speak(utt);
+  if(voices.length>0){ doSpeak(); }
+  else {
+    synth.onvoiceschanged=function(){ synth.onvoiceschanged=null; doSpeak(); };
+    // Fallback timeout in case onvoiceschanged never fires
+    setTimeout(function(){ if(!synth.speaking) doSpeak(); },500);
+  }
 }
-window.speechSynthesis.onvoiceschanged=()=>{};
 
 function render(){
   const container=document.getElementById("cards");
@@ -320,16 +332,22 @@ async function createLink(){
 "",
 "function speakText(text,langCode){",
 "  if(!text) return;",
-"  var synth=window.speechSynthesis;",
-"  synth.cancel();",
-"  var utt=new SpeechSynthesisUtterance(text);",
-"  utt.lang=langCode; utt.rate=0.85;",
-"  var voices=synth.getVoices();",
-"  var m=voices.find(function(v){return v.lang.startsWith(langCode.split('-')[0]);});",
-"  if(m) utt.voice=m;",
-"  synth.speak(utt);",
+"  var synth=window.speechSynthesis; synth.cancel();",
+"  function doSpeak(){",
+"    var utt=new SpeechSynthesisUtterance(text);",
+"    utt.lang=langCode; utt.rate=0.85;",
+"    var voices=synth.getVoices();",
+"    var base=langCode.split('-')[0];",
+"    var m=voices.find(function(v){return v.lang===langCode;})||voices.find(function(v){return v.lang.startsWith(base);});",
+"    if(m) utt.voice=m;",
+"    synth.speak(utt);",
+"  }",
+"  if(synth.getVoices().length>0){ doSpeak(); }",
+"  else{",
+"    synth.onvoiceschanged=function(){synth.onvoiceschanged=null;doSpeak();};",
+"    setTimeout(function(){if(!synth.speaking)doSpeak();},500);",
+"  }",
 "}",
-"window.speechSynthesis.onvoiceschanged=function(){};",
 "",
 "function startGame(){",
 "  var count=parseInt(document.getElementById('imageCount').value);",
@@ -600,7 +618,5 @@ function dlQRpdf() {
     <button class="qr-cl" onclick="document.getElementById('qr-modal').classList.remove('on')">Stäng</button>
   </div>
 </div>
-</body>
-</html
 </body>
 </html>
